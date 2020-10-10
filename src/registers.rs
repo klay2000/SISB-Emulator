@@ -1,4 +1,3 @@
-use std::panic::UnwindSafe;
 
 pub struct Registers {
 	ip: u16,
