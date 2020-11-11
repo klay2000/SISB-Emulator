@@ -1,6 +1,6 @@
 
 pub struct Registers {
-	ip: u16,
+	ip: u32,
 	acc: i16,
 	mem: i16,
 	inn: i16,
@@ -48,22 +48,22 @@ impl Registers {
 		self.ip += 1;
 	}
 
-	pub fn increment_ip_by_n(&mut self, n: u16) {
+	pub fn increment_ip_by_n(&mut self, n: u32) {
 		self.ip += n;
 	}
 
-	pub fn set_ip(&mut self, n: u16) {
+	pub fn set_ip(&mut self, n: u32) {
 		self.ip = n;
 	}
 
-	pub fn get_ip(&self) -> u16 {
+	pub fn get_ip(&self) -> u32 {
 		return self.ip;
 	}
 }
 
 #[cfg(test)]
 mod test {
-	use registers::Registers;
+	use crate::Registers;
 	use std::panic;
 
 	#[test]
