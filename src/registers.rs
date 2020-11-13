@@ -50,20 +50,32 @@ impl Registers {
 		}
 	}
 
-	pub fn push_reg(&mut self, register: u8){
+	pub fn push_reg(&mut self, register: u8) -> bool{
 		if register >= 36 && register <= 63{
-			self.p_stack_frames[register as usize] += 1;
+			if self.p_stack_frames[(register-36) as usize] == 255{ return false; }
+
+			self.p_stack_frames[(register - 36) as usize] += 1;
 
 			//clear out frame for use
-			self.p_reg[self.p_stack_frames[register as usize] as usize][register as usize] = 0;
+			self.p_reg[self.p_stack_frames[(register - 36) as usize] as usize]
+				[(register - 36) as usize] = 0;
 		}
+		return true;
 	}
 
-	pub fn pop_reg(&mut self, register: u8){
-		if register >= 36 && register <= 63 { self.p_stack_frames[register as usize] -= 1; }
+	pub fn pop_reg(&mut self, register: u8) -> bool{
+		if register >= 36 && register <= 63 {
+			if self.p_stack_frames[(register-36) as usize] == 0 { return false; }
+
+			self.p_stack_frames[(register - 36) as usize] -= 1;
+		}
+		return true;
 	}
 
-	pub fn push_frame(&mut self){
+	pub fn push_frame(&mut self) -> bool{
+
+		if self.stack_frame == 255 { return false; }
+
 		self.stack_frame += 1;
 
 		//clear out frame for use
@@ -71,9 +83,18 @@ impl Registers {
 		self.mem[self.stack_frame as usize] = 0;
 		self.g_reg[self.stack_frame as usize] = vec![0; 32];
 		self.ip[self.stack_frame as usize] = 0;
+
+		return true;
 	}
 
-	pub fn pop_frame(&mut self){ self.stack_frame -= 1; }
+	pub fn pop_frame(&mut self) -> bool{
+
+		if self.stack_frame == 0 { return false; }
+
+		self.stack_frame -= 1;
+
+		return true;
+	}
 
 	pub fn increment_ip(&mut self) { self.ip[self.stack_frame as usize] += 1; }
 
@@ -156,23 +177,65 @@ mod test {
 		r.write(4, 6);
 		r.write(35, 3);
 
-		r.push_frame();
+		assert_eq!(r.push_frame(), true);
 
 		assert_eq!(r.get_ip(), 0);
 		assert_eq!(r.read(26), 0);
 		assert_eq!(r.read(4), 0);
 		assert_eq!(r.read(35), 0);
 
-		r.pop_frame();
+		assert_eq!(r.pop_frame(), true);
 
 		assert_eq!(r.get_ip(), 12);
 		assert_eq!(r.read(26), 12);
 		assert_eq!(r.read(4), 6);
 		assert_eq!(r.read(35), 3);
+
+		assert_eq!(r.pop_frame(), false);
+
+		r.stack_frame = 0xFF;
+
+		assert_eq!(r.push_frame(), false);
+		assert_eq!(r.pop_frame(), true);
 	}
 
 	#[test]
 	fn reg_stacks(){
+		let mut r = Registers::new();
 
+		r.write(5, 2);
+
+		assert_eq!(r.push_reg(5), true);
+
+		assert_eq!(r.read(5), 2);
+
+		r.write(36, 3);
+		r.write(63, 4);
+		r.write(48, 2);
+		r.write(49, 1);
+
+		assert_eq!(r.push_reg(36), true);
+		assert_eq!(r.push_reg(63), true);
+		assert_eq!(r.push_reg(48), true);
+
+		assert_eq!(r.read(49), 1);
+		assert_eq!(r.read(48), 0);
+		assert_eq!(r.read(63), 0);
+		assert_eq!(r.read(36), 0);
+
+		assert_eq!(r.pop_reg(48), true);
+		assert_eq!(r.pop_reg(63), true);
+		assert_eq!(r.pop_reg(36), true);
+
+		assert_eq!(r.read(48), 2);
+		assert_eq!(r.read(63), 4);
+		assert_eq!(r.read(36), 3);
+
+		assert_eq!(r.pop_reg(43), false);
+
+		r.p_stack_frames[0] = 0xFF;
+
+		assert_eq!(r.push_reg(36), false);
+		assert_eq!(r.pop_reg(36), true);
 	}
 }
