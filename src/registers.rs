@@ -1,33 +1,38 @@
 
 pub struct Registers {
-	ip: u32,
-	acc: i16,
-	mem: i16,
-	inn: i16,
-	g_reg: Vec<i16>,
-	p_reg: Vec<i16>,
+	ip: Vec<u32>,
+	acc: Vec<i16>,
+	mem: Vec<i16>,
+	inn: u16,
+	g_reg: Vec<Vec<i16>>,
+	p_reg: Vec<Vec<i16>>,
+	p_stack_frames: Vec<u8>,
+	stack_frame: u8
 }
 
 impl Registers {
 	pub fn new() -> Registers {
 		Registers {
-			ip: 0,
-			acc: 0,
-			mem: 0,
+			ip: vec![0; 256],
+			acc: vec![0; 256],
+			mem: vec![0; 256],
 			inn: 0,
-			g_reg: vec![0; 32],
-			p_reg: vec![0; 28],
+			g_reg: vec![vec![0; 32]; 256],
+			p_reg: vec![vec![0; 28]; 256],
+			p_stack_frames: vec![0; 28],
+			stack_frame: 0
 		}
 	}
 
 	pub fn write(&mut self, register: u8, value: i16) {
 		match register {
 			0 => return,
-			1 => self.acc = value,
-			2 => self.mem = value,
-			3 => self.inn = value,
-			4..=34 => self.g_reg[(register - 4) as usize] = value,
-			35..=63 => self.p_reg[(register - 36) as usize] = value,
+			1 => self.acc[self.stack_frame as usize] = value,
+			2 => self.mem[self.stack_frame as usize] = value,
+			3 => self.inn = value as u16,
+			4..=35 => self.g_reg[self.stack_frame as usize][(register - 4) as usize] = value,
+			36..=63 => self.p_reg[self.p_stack_frames[(register - 36) as usize] as usize]
+				[(register - 36) as usize] = value,
 			_ => panic!("Invalid register!"),
 		}
 	}
@@ -35,29 +40,51 @@ impl Registers {
 	pub fn read(&self, register: u8) -> i16 {
 		match register {
 			0 => return 0,
-			1 => return self.acc,
-			2 => return self.mem,
-			3 => return self.inn,
-			4..=34 => return self.g_reg[(register - 4) as usize],
-			35..=63 => return self.p_reg[(register - 36) as usize],
+			1 => return self.acc[self.stack_frame as usize],
+			2 => return self.mem[self.stack_frame as usize],
+			3 => return self.inn as i16,
+			4..=35 => return self.g_reg[self.stack_frame as usize][(register - 4) as usize],
+			36..=63 => return self.p_reg[self.p_stack_frames[(register - 36) as usize] as usize]
+				[(register - 36) as usize],
 			_ => panic!("Invalid register!"),
 		}
 	}
 
-	pub fn increment_ip(&mut self) {
-		self.ip += 1;
+	pub fn push_reg(&mut self, register: u8){
+		if register >= 36 && register <= 63{
+			self.p_stack_frames[register as usize] += 1;
+
+			//clear out frame for use
+			self.p_reg[self.p_stack_frames[register as usize] as usize][register as usize] = 0;
+		}
 	}
 
-	pub fn increment_ip_by_n(&mut self, n: u32) {
-		self.ip += n;
+	pub fn pop_reg(&mut self, register: u8){
+		if register >= 36 && register <= 63 { self.p_stack_frames[register as usize] -= 1; }
 	}
+
+	pub fn push_frame(&mut self){
+		self.stack_frame += 1;
+
+		//clear out frame for use
+		self.acc[self.stack_frame as usize] = 0;
+		self.mem[self.stack_frame as usize] = 0;
+		self.g_reg[self.stack_frame as usize] = vec![0; 32];
+		self.ip[self.stack_frame as usize] = 0;
+	}
+
+	pub fn pop_frame(&mut self){ self.stack_frame -= 1; }
+
+	pub fn increment_ip(&mut self) { self.ip[self.stack_frame as usize] += 1; }
+
+	pub fn increment_ip_by_n(&mut self, n: u32) { self.ip[self.stack_frame as usize] += n; }
 
 	pub fn set_ip(&mut self, n: u32) {
-		self.ip = n;
+		self.ip[self.stack_frame as usize] = n;
 	}
 
 	pub fn get_ip(&self) -> u32 {
-		return self.ip;
+		return self.ip[self.stack_frame as usize];
 	}
 }
 
@@ -118,5 +145,34 @@ mod test {
 
 		r.set_ip(12);
 		assert_eq!(r.get_ip(), 12);
+	}
+
+	#[test]
+	fn main_stack() {
+		let mut r = Registers::new();
+
+		r.set_ip(12);
+		r.write(26, 12);
+		r.write(4, 6);
+		r.write(35, 3);
+
+		r.push_frame();
+
+		assert_eq!(r.get_ip(), 0);
+		assert_eq!(r.read(26), 0);
+		assert_eq!(r.read(4), 0);
+		assert_eq!(r.read(35), 0);
+
+		r.pop_frame();
+
+		assert_eq!(r.get_ip(), 12);
+		assert_eq!(r.read(26), 12);
+		assert_eq!(r.read(4), 6);
+		assert_eq!(r.read(35), 3);
+	}
+
+	#[test]
+	fn reg_stacks(){
+
 	}
 }
